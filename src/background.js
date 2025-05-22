@@ -12,19 +12,35 @@ function startTracking(tabId, url) {
     activeSince = Date.now();
 
     timerId = setTimeout(() => {
+        // Log the user stayed on tab for 30s: ${url}
         console.log(`[LinkMeld] User stayed on tab for 30s: ${url}`);
 
-        // send data to backedn 
-        fetch('https://localhost:3000/track', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json', \
-            },
-            body: JSON.stringify({
-                url,
-                timestamp: new Date().toISOString(),
-            })
-        });
+        // Send message to content script to get page content
+        chrome.tabs.sendMessage(tabId, {
+            action: 'getPageContent'
+        }, (response) => {
+            if (chrome.runtime.lastError || !response) {
+                console.error('Error getting page content:', chrome.runtime.lastError);
+                return;
+            }
+
+            console.log('Page content:', response);
+
+            // send page content to backend
+            fetch('https://localhost:3000/track', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url,
+                    timestamp: new Date().toISOString(),
+                    text: response.text,
+                    html: response.html,
+                })
+            });
+        }
+        );
     }, TRACKING_DURATION);
 }
 
