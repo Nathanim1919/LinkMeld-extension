@@ -1,160 +1,242 @@
 console.log('[LinkMeld] Content script loaded');
 
-// Function to find document URLs (PDFs, DOCs, etc.)
-function findDocumentUrls() {
-    // Embedded documents (PDFs)
-    const pdfElements = document.querySelectorAll('iframe[src$=".pdf"], object[data$=".pdf"], embed[src$=".pdf"]');
-    const embeddedPdfs = Array.from(pdfElements).map(el => ({
-        url: el.src || el.data,
-        type: 'pdf'
-    })).filter(doc => doc.url);
+// Configuration
+const MAX_TEXT_LENGTH = 100000;
+const MIN_TEXT_LENGTH = 50;
+const MAX_DESCRIPTION_LENGTH = 500;
 
-    // Linked documents (PDFs, DOCs)
-    const docLinks = document.querySelectorAll('a[href$=".pdf"], a[href$=".doc"], a[href$=".docx"]');
-    const linkedDocs = Array.from(docLinks).map(a => ({
-        url: a.href,
-        type: a.href.endsWith('.pdf') ? 'pdf' : 'doc'
-    })).filter(doc => doc.url);
+// Optimized document URL finder
+function findDocumentUrls(pageUrl) {
+  const urls = new Map();
 
-    // Combine and remove duplicates by URL
-    const allDocs = [...embeddedPdfs, ...linkedDocs];
-    const uniqueDocs = Array.from(new Map(allDocs.map(doc => [doc.url, doc])).values());
-    return uniqueDocs;
-}
+  // If the page itself is a PDF, include it as a document
+  if (pageUrl.match(/\.pdf($|\?)/i)) {
+    urls.set(pageUrl.split('?')[0], { url: pageUrl, type: 'pdf' });
+    return Array.from(urls.values());
+  }
 
-// Function to capture interactive elements (forms, buttons)
-function captureInteractiveElements() {
-    // Forms
-    const forms = Array.from(document.querySelectorAll('form')).map(form => ({
-        action: form.action || '',
-        method: form.method || 'GET',
-        inputs: Array.from(form.querySelectorAll('input, textarea, select')).map(input => ({
-            type: input.type || input.tagName.toLowerCase(),
-            name: input.name || '',
-            value: input.value || ''
-        }))
-    }));
-
-    // Buttons
-    const buttons = Array.from(document.querySelectorAll('button')).map(button => ({
-        text: button.textContent.trim(),
-        type: button.type || 'button'
-    }));
-
-    return { forms, buttons };
-}
-
-// Function to capture all webpage content
-function capturePageData() {
-    let mainText = '';
-
-    // --- Enhanced Main Text Extraction ---
-    try {
-        const article = new Readability(document).parse();
-        if (article && article.textContent) {
-            mainText = article.textContent;
-
-            // Post-processing Readability.js output to remove common noisy patterns
-            // This can include typical footer/header text, copyright notices, social media prompts
-            mainText = mainText.replace(/Skip to content/gi, '');
-            mainText = mainText.replace(/Home > Guides/gi, ''); // Specific to your example
-            mainText = mainText.replace(/Last updated on\s*May 4, 2025/gi, ''); // Specific to your example
-            mainText = mainText.replace(/Leave a Comment Cancel ReplyYour email address will not be published\. Required fields are marked \*Type here\.\.Name\*Email\*Website\s*Save my name, email, and website in this browser for the next time I comment\.\s*Δdocument\.getElementById\(\s*"ak_js_\d"\s*\)\.setAttribute\(\s*"value",\s*\( new Date\(\) \)\.getTime\(\) \);\s*/gi, ''); // Remove comment section
-            mainText = mainText.replace(/Keep in mind that we may receive commissions when you click our links and make purchases\. However, this does not impact our reviews and comparisons\. We try our best to keep things fair and balanced, in order to help you make the best choice for you\./gi, ''); // Remove disclaimer
-            mainText = mainText.replace(/Follow Us![\s\S]*?(?:Facebook|Twitter|Youtube)/gi, ''); // Remove social media follow section
-            mainText = mainText.replace(/Copyright \d{4} © All rights Reserved\./gi, ''); // Remove copyright notice
-            mainText = mainText.replace(/Home\s*About\s*Disclaimer\s*Contact/gi, ''); // Remove footer navigation links
-            mainText = mainText.replace(/Search/gi, ''); // Remove common search text if it's in the main content from readability
-            mainText = mainText.replace(/Add Your Heading Text Here[\s\S]*?Click here/gi, ''); // Remove the "Add Your Heading Text Here" block
-            mainText = mainText.replace(/\b\d+\s*(LinkedIn|Future Learn|Books|Stanford|Coursera|Free Apps|Apps)\b[\s\S]*?(?:Updated|\d{4}|For Everyone)/gi, ''); // Remove related articles/posts
-            mainText = mainText.replace(/CourseNerd Team/gi, ''); // Remove author name if present in main content
-
-            // Clean up multiple newlines and spaces
-            mainText = mainText.replace(/\n\s*\n/g, '\n'); // Replace multiple newlines with a single one
-            mainText = mainText.replace(/\s{2,}/g, ' '); // Replace multiple spaces with a single space
-            mainText = mainText.trim(); // Trim leading/trailing whitespace
-        } else {
-            console.warn('[LinkMeld] Readability.js returned no article or text content. Falling back to body text.');
-            mainText = document.body.textContent || ''; // Fallback to body text
-            mainText = mainText.trim();
-        }
-    } catch (e) {
-        console.error('[LinkMeld] Readability.js failed:', e);
-        mainText = document.body.textContent || ''; // Fallback
-        mainText = mainText.trim();
+  // Check <a> tags
+  const links = document.getElementsByTagName('a');
+  for (let i = 0; i < links.length; i++) {
+    const href = links[i].href;
+    if (!href) continue;
+    if (href.match(/\.pdf($|\?)/i)) {
+      urls.set(href.split('?')[0], { url: href, type: 'pdf' });
+    } else if (href.match(/\.docx?($|\?)/i)) {
+      urls.set(href.split('?')[0], { url: href, type: 'doc' });
     }
-    // --- End Enhanced Main Text Extraction ---
+  }
 
-    // Extract full DOM as HTML
-    const fullDom = document.documentElement.outerHTML;
+  // Check embedded PDFs
+  const embeds = document.querySelectorAll('iframe[src*=".pdf"], embed[src*=".pdf"], object[data*=".pdf"]');
+  for (const embed of embeds) {
+    const src = embed.src || embed.data;
+    if (src) {
+      urls.set(src.split('?')[0], { url: src, type: 'pdf' });
+    }
+  }
 
-    // Extract image URLs
-    const images = Array.from(document.querySelectorAll('img'))
-        .map(img => ({
-            src: img.src,
-            alt: img.alt || ''
-        }))
-        .filter(img => img.src && !img.src.startsWith('data:'));
+  return Array.from(urls.values());
+}
 
-    // Extract video URLs
-    const videos = Array.from(document.querySelectorAll('video'))
-        .map(video => ({
-            src: video.src,
-            duration: video.duration || null
-        }))
-        .filter(video => video.src);
+// Efficient text cleaner
+function cleanText(text) {
+  if (!text) return '';
+  const noisePatterns = [
+    /(Home|About|Contact|Disclaimer)[\s>|»]/gi,
+    /Skip to content/gi,
+    /Main navigation/gi,
+    /Last updated on .+/gi,
+    /Published on .+/gi,
+    /Leave a Comment.*?type here\.\./gis,
+    /Follow (us|me) on .*/gi,
+    /Copyright ©.*?All rights reserved/gi,
+    /Terms of Service|Privacy Policy/gi,
+    /document\.getElementById\(.*?\);/gi,
+    /window\.location\.href.*?;/gi,
+    /\s*\n\s*\n\s*/g,
+    /[ \t]{2,}/g,
+  ];
+  let cleaned = text;
+  for (const pattern of noisePatterns) {
+    cleaned = cleaned.replace(pattern, ' ');
+  }
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  if (cleaned.length > MAX_TEXT_LENGTH) {
+    console.warn(`[LinkMeld] Content too long (${cleaned.length} chars), truncating`);
+    cleaned = cleaned.substring(0, MAX_TEXT_LENGTH);
+  }
+  return cleaned;
+}
 
-    // Extract audio URLs
-    const audios = Array.from(document.querySelectorAll('audio'))
-        .map(audio => ({
-            src: audio.src,
-            duration: audio.duration || null
-        }))
-        .filter(audio => audio.src);
-
-    // Extract all link URLs
-    const links = Array.from(document.querySelectorAll('a'))
-        .map(a => ({
-            href: a.href,
-            text: a.textContent.trim()
-        }))
-        .filter(link => link.href);
-
-    // Extract document URLs (PDFs, DOCs)
-    const documents = findDocumentUrls();
-
-    // Extract interactive elements
-    const interactive = captureInteractiveElements();
-
-    // Extract metadata
-    const metadata = {
-        title: document.title || 'Untitled',
-        description: document.querySelector('meta[name="description"]')?.content || '',
-        url: window.location.href,
-        favicon: document.querySelector('link[rel*="icon"]')?.href || ''
-    };
-
-    // Package all captured data
+// Main content extractor
+function extractMainContent(isPdf) {
+  if (isPdf) {
     return {
-        frameUrl: window.location.href,
-        metadata: metadata,
-        mainText: mainText,
-        fullDom: fullDom,
-        images: images,
-        videos: videos,
-        audios: audios,
-        links: links,
-        documents: documents,
-        interactive: interactive,
-        timestamp: new Date().toISOString()
+      content: '',
+      title: document.title || 'Untitled PDF',
+      method: 'pdf',
     };
+  }
+  try {
+    const article = new Readability(document).parse();
+    if (article?.textContent) {
+      const cleaned = cleanText(article.textContent);
+      if (cleaned.length >= MIN_TEXT_LENGTH) {
+        return {
+          content: cleaned,
+          title: article.title,
+          byline: article.byline,
+          excerpt: article.excerpt,
+          method: 'readability',
+        };
+      }
+    }
+  } catch (e) {
+    console.error('[LinkMeld] Readability error:', e);
+  }
+  const contentSelectors = ['article', 'main', '[role="main"]', '.post-content', '.entry-content', '#content', '#main-content'];
+  for (const selector of contentSelectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const text = cleanText(el.textContent);
+      if (text.length >= MIN_TEXT_LENGTH) {
+        return {
+          content: text,
+          title: document.title,
+          method: `selector:${selector}`,
+        };
+      }
+    }
+  }
+  const bodyText = cleanText(document.body.textContent);
+  if (bodyText.length >= MIN_TEXT_LENGTH) {
+    return {
+      content: bodyText,
+      title: document.title,
+      method: 'body',
+    };
+  }
+  return {
+    content: '',
+    title: document.title,
+    method: 'empty',
+  };
 }
 
-// Listen for messages from popup.js
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'getPageContent') {
-        console.log('[LinkMeld] Received getPageContent message');
-        const capturedData = capturePageData();
-        sendResponse(capturedData);
+// Description extractor
+function extractDescription(isPdf) {
+  if (isPdf) {
+    return 'PDF document'; // Placeholder for direct PDFs
+  }
+  const metaDesc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
+  if (metaDesc) {
+    const cleaned = cleanText(metaDesc);
+    return cleaned.length > MAX_DESCRIPTION_LENGTH ? cleaned.substring(0, MAX_DESCRIPTION_LENGTH) : cleaned;
+  }
+  const mainContent = document.querySelector('article, main, [role="main"]')?.textContent || '';
+  if (mainContent) {
+    const cleaned = cleanText(mainContent);
+    return cleaned.length > MAX_DESCRIPTION_LENGTH ? cleaned.substring(0, MAX_DESCRIPTION_LENGTH) : cleaned;
+  }
+  return '';
+}
+
+// Lightweight metadata extractor
+function extractMetadata(isPdf) {
+  const desc = extractDescription(isPdf);
+  if (isPdf) {
+    return {
+      title: document.title || 'Untitled PDF',
+      description: desc,
+      url: window.location.href,
+      favicon: '',
+      siteName: '',
+      publishedTime: '',
+      author: '',
+      keywords: '',
+      viewport: '',
+    };
+  }
+  const getMetaContent = (name) => {
+    const el = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
+    return el?.content || '';
+  };
+  return {
+    title: document.title || 'Untitled',
+    description: desc,
+    url: window.location.href,
+    favicon: document.querySelector('link[rel*="icon"]')?.href || '',
+    siteName: getMetaContent('og:site_name'),
+    publishedTime: getMetaContent('article:published_time'),
+    author: getMetaContent('author'),
+    keywords: getMetaContent('keywords'),
+    viewport: document.querySelector('meta[name="viewport"]')?.content || '',
+  };
+}
+
+// Performance monitoring
+function withPerformanceTracking(fn, metricName) {
+  return (...args) => {
+    const start = performance.now();
+    try {
+      const result = fn(...args);
+      const duration = performance.now() - start;
+      if (duration > 100) {
+        console.log(`[LinkMeld] ${metricName} took ${duration.toFixed(1)}ms`);
+      }
+      return {
+        ...result,
+        _metrics: {
+          ...(result._metrics || {}),
+          [metricName]: duration,
+        },
+      };
+    } catch (error) {
+      console.error(`[LinkMeld] Error in ${metricName}:`, error);
+      throw error;
     }
+  };
+}
+
+// Message handler
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getPageContent') {
+    const startTime = performance.now();
+    try {
+      const isPdf = window.location.href.match(/\.pdf($|\?)/i);
+      const content = withPerformanceTracking(extractMainContent, 'contentExtraction')(isPdf);
+      const documents = withPerformanceTracking(findDocumentUrls, 'documentExtraction')(window.location.href);
+      const metadata = withPerformanceTracking(extractMetadata, 'metadataExtraction')(isPdf);
+      const response = {
+        success: true,
+        mainText: content.content,
+        metadata: {
+          ...metadata,
+          title: content.title || metadata.title,
+          extractionMethod: content.method,
+        },
+        documents,
+        metrics: {
+          ...(content._metrics || {}),
+          ...(documents._metrics || {}),
+          ...(metadata._metrics || {}),
+          totalTime: performance.now() - startTime,
+          textLength: content.content.length,
+          documentCount: documents.length,
+        },
+      };
+      sendResponse(response);
+    } catch (error) {
+      console.error('[LinkMeld] Content extraction failed:', error);
+      sendResponse({
+        success: false,
+        error: error.message,
+        url: window.location.href,
+      });
+    }
+  }
+  return true;
 });
+
+console.log('[LinkMeld] Content script initialized');
