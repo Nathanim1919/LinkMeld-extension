@@ -1,28 +1,212 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Capture Page</title>
-    <style>
-      body {
-        min-width: 200px;
-        font-family: sans-serif;
-        padding: 10px;
-      }
-      button {
-        padding: 8px 12px;
-        background-color: #6366f1;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <h3>Context Capture</h3>
-    <button id="captureBtn">Capture Now</button>
-    <p id="status"></p>
+<head>
+  <title>Context Capture</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #ffffff;
+      --border: #e5e7eb;
+      --hover-bg: #f9fafb;
+    }
+    
+    body {
+      width: 300px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: var(--text);
+      background-color: var(--bg);
+    }
+    
+    .container {
+      padding: 16px;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    
+    .logo {
+      font-weight: 600;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .logo-icon {
+      width: 20px;
+      height: 20px;
+    }
+    
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .btn {
+      padding: 8px 12px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    
+    .btn:hover {
+      background-color: var(--primary-dark);
+    }
+    
+    .btn-secondary {
+      background-color: white;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    
+    .btn-secondary:hover {
+      background-color: var(--hover-bg);
+    }
+    
+    .nav-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .nav-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text);
+    }
+    
+    .nav-item:hover {
+      background-color: var(--hover-bg);
+    }
+    
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-light);
+    }
+    
+    .status {
+      font-size: 12px;
+      color: var(--text-light);
+      padding: 8px 0;
+      text-align: center;
+      margin-top: 12px;
+    }
+    
+    .capture-options {
+      display: none;
+      padding: 8px 0;
+    }
+    
+    .capture-option {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    
+    .capture-option:hover {
+      background-color: var(--hover-bg);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 8V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Context Capture
+      </div>
+    </div>
+    
+    <div class="quick-actions">
+      <button id="captureBtn" class="btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 8V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Capture
+      </button>
+      <button id="openAppBtn" class="btn btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M12 2C14.5013 4.73835 15.9228 8.29203 16 12C15.9228 15.708 14.5013 19.2616 12 22C9.49872 19.2616 8.07725 15.708 8 12C8.07725 8.29203 9.49872 4.73835 12 2V2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Open App
+      </button>
+    </div>
+    
+    <div id="captureOptions" class="capture-options">
+      <div class="capture-option" data-type="page">Capture Entire Page</div>
+      <div class="capture-option" data-type="selection">Capture Selection</div>
+      <div class="capture-option" data-type="screenshot">Take Screenshot</div>
+    </div>
+    
+    <div class="nav-menu">
+      <a href="#" class="nav-item" id="navNotes">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 6H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 6H3.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 12H3.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 18H3.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        My Notes
+      </a>
+      <a href="#" class="nav-item" id="navBookmarks">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Bookmarks
+      </a>
+      <a href="#" class="nav-item" id="navFolders">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22 19C22 19.5304 21.7893 20.0391 21.4142 20.4142C21.0391 20.7893 20.5304 21 20 21H4C3.46957 21 2.96086 20.7893 2.58579 20.4142C2.21071 20.0391 2 19.5304 2 19V5C2 4.46957 2.21071 3.96086 2.58579 3.58579C2.96086 3.21071 3.46957 3 4 3H9L11 6H20C20.5304 6 21.0391 6.21071 21.4142 6.58579C21.7893 6.96086 22 7.46957 22 8V19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Folders
+      </a>
+    </div>
+    
+    <p id="status" class="status">Ready to capture</p>
+  </div>
 
-    <script src="popup.js"></script>
-  </body>
+  <script src="popup.js"></script>
+</body>
 </html>

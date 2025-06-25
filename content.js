@@ -1,3 +1,4 @@
+// Content Script
 console.log('[LinkMeld] Content script loaded');
 
 // Configuration

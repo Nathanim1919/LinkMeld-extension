@@ -1,3 +1,4 @@
+// Chrome Extension Background Script
 let activeTabId = null;
 let timerId = null;
 let activeSince = null;
@@ -53,21 +54,6 @@ function handleTabChange(tabId) {
 }
 
 
-
-// Detect tab switches
-// chrome.tabs.onActivated.addListener(({ tabId }) => {
-//     handleTabChange(tabId);
-// });
-
-
-// Detect window focus switches
-// chrome.windows.onFocusedChanged.addListener((windowId) => {
-//     if (windowId === chrome.windows.WINDOW_ID_NONE) return;
-//     chrome.tabs.query({ active: true, windowId }, (tabs) => {
-//         if (tabs.length === 0) return;
-//         handleTabChange(tabs[0].id);
-//     });
-// })
 
 
 // Optional: Handle tab updates (like URL change in same tab)
